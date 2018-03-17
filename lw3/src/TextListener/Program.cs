@@ -10,7 +10,7 @@ namespace TextListener
     {
         private static string GetValueById(string id) 
         {
-            ConnectionMultiplexer redis = ConnectionMultiplexer.Connect("localhost");
+            ConnectionMultiplexer redis = ConnectionMultiplexer.Connect("localhost, abortConnect=false");
             IDatabase db = redis.GetDatabase();
 
             return db.StringGet(id);

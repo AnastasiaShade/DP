@@ -16,7 +16,7 @@ namespace Backend.Controllers
         [HttpGet("{id}")]
         public string Get(string id)
         {
-            ConnectionMultiplexer redis = ConnectionMultiplexer.Connect("localhost");
+            ConnectionMultiplexer redis = ConnectionMultiplexer.Connect("localhost, abortConnect=false");
             IDatabase db = redis.GetDatabase();
 
             return db.StringGet(id);
@@ -24,7 +24,7 @@ namespace Backend.Controllers
 
         private void SendToBD(string id, string value)
         {
-            ConnectionMultiplexer redis = ConnectionMultiplexer.Connect("localhost");
+            ConnectionMultiplexer redis = ConnectionMultiplexer.Connect("localhost, abortConnect=false");
             IDatabase db = redis.GetDatabase();
 
             db.StringSet(id, value);         
