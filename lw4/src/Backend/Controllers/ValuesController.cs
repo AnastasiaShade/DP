@@ -6,20 +6,63 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using RabbitMQ.Client;
 using StackExchange.Redis;
+using System.Threading;
 
 namespace Backend.Controllers
 {
     [Route("api/[controller]")]
     public class ValuesController : Controller
     {
-        // GET api/values/<id>
-        [HttpGet("{id}")]
-        public string Get(string id)
+        private string GetFromDB(string id)
         {
             ConnectionMultiplexer redis = ConnectionMultiplexer.Connect("localhost, abortConnect=false");
             IDatabase db = redis.GetDatabase();
+            string value = db.StringGet(id);
+            int tryNumber = 10;
+            int sleepTime = 200;
 
-            return db.StringGet(id);
+            for (int i = 0; i <= tryNumber; ++i)
+            {
+                if (value != null)
+                {
+                    try
+                    {
+                        float tmpValue = (float) Convert.ToDouble(value);
+                        break;
+                    }
+                    catch(FormatException)
+                    {
+
+                    }
+                }
+
+                Thread.Sleep(sleepTime);
+                value = db.StringGet(id);
+            }
+
+            return value;
+        }
+
+        private IActionResult GetStatusCode(string value)
+        {
+            IActionResult result = null;
+            if (value != null) 
+            {
+                result = Ok(value);
+            }
+            else
+            {
+                result = new NotFoundResult();
+            }
+            return result;
+        }
+
+        // GET api/values/<id>
+        [HttpGet("{id}")]
+        public IActionResult Get(string id)
+        {
+            string value = GetFromDB(id);
+            return GetStatusCode(value);
         }
 
         private void SendToBD(string id, string value)
@@ -29,27 +72,23 @@ namespace Backend.Controllers
 
             db.StringSet(id, value);
         }
+
         private void SendToQueue(string id)
         {
             var factory = new ConnectionFactory() { HostName = "localhost" };
             using(var connection = factory.CreateConnection())
             using(var channel = connection.CreateModel())
             {
-                channel.QueueDeclare(queue: "backend-api",
-                                    durable: false,
-                                    exclusive: false,
-                                    autoDelete: false,
-                                    arguments: null
-                );
+                channel.ExchangeDeclare("backend-api", "fanout");
 
-                string message = id;
+                string message = "TextCreated:" + id;
                 var body = Encoding.UTF8.GetBytes(message);
 
-                channel.BasicPublish(exchange: "",
-                                    routingKey: "backend-api",
+                channel.BasicPublish(exchange: "backend-api",
+                                    routingKey: "",
                                     basicProperties: null,
                                     body: body
-                );
+                ); 
             }
         }
 
