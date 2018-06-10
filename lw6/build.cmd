@@ -5,8 +5,8 @@ if "%~1" EQU "" goto error
 echo Creating project structure...
 mkdir lw6_%~1\"Frontend"
 mkdir lw6_%~1\"Backend"
-mkdir lw5_%~1\"TextListener"
-mkdir lw5_%~1\"TextRankCalc"
+mkdir lw6_%~1\"TextListener"
+mkdir lw6_%~1\"TextRankCalc"
 mkdir lw6_%~1\"VowelConsCounter"
 mkdir lw6_%~1\"VowelConsRater"
 mkdir lw6_%~1"\"config"

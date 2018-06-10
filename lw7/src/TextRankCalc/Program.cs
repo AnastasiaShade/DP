@@ -1,36 +1,33 @@
 ﻿using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using StackExchange.Redis;
 using System;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace TextListener
+namespace TextRankCalc
 {
     class Program
     {
-        private static string GetValueById(string id) 
+        private static void SendToQueue(string id)
         {
-            int dbIndex = GetDBIndexByMessageHash(id);
-            ConnectionMultiplexer redis = ConnectionMultiplexer.Connect("localhost, abortConnect=false");
-            IDatabase db = redis.GetDatabase(dbIndex);
-            string value = db.StringGet(id);
-            Console.WriteLine(id + " got from db" + dbIndex);
-
-            return value;
-        }
-
-        private static int GetDBIndexByMessageHash(string msg)
-        {
-            int hash = 0;
-            foreach (Char symbol in msg)
+            var factory = new ConnectionFactory() { HostName = "localhost" };
+            using(var connection = factory.CreateConnection())
+            using(var channel = connection.CreateModel())
             {
-                hash += symbol;
+                channel.ExchangeDeclare("text-rank-tasks", "direct");
+
+                string message = "TextRankTask:" + id;
+                var body = Encoding.UTF8.GetBytes(message);
+
+                channel.BasicPublish(exchange: "text-rank-tasks",
+                                    routingKey: "text-rank-task",
+                                    basicProperties: null,
+                                    body: body
+                );
             }
-            return hash % 16;
         }
-        
-        public static void Main(string[] args)
+
+        static void Main(string[] args)
         {
             var factory = new ConnectionFactory() { HostName = "localhost" };
             using(var connection = factory.CreateConnection())
@@ -49,9 +46,13 @@ namespace TextListener
                     {
                         var body = ea.Body;
                         var message = Encoding.UTF8.GetString(body);
-                        string id = Regex.Split(message, ":")[1];
-                        string value = GetValueById(id);
-                        Console.WriteLine(id + " : " + value);
+                        var data = Regex.Split(message, ":");
+                        if (data[0] == "TextCreated")
+                        {
+                            Console.WriteLine(message);
+                            string id = data[1];
+                            SendToQueue(id);
+                        }
                     };
                     
                     channel.BasicConsume(queue: queueName,

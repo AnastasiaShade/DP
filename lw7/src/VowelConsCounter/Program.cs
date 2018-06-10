@@ -1,6 +1,5 @@
 ﻿using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using StackExchange.Redis;
 using System;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -31,27 +30,6 @@ namespace VowelConsCounter
                     consonantCount++;
                 }
             }
-        }
-
-        private static string GetValueById(string id) 
-        {
-            int dbIndex = GetDBIndexByMessageHash(id);
-            ConnectionMultiplexer redis = ConnectionMultiplexer.Connect("localhost, abortConnect=false");
-            IDatabase db = redis.GetDatabase(dbIndex);
-            string value = db.StringGet(id);
-            Console.WriteLine(id + " got from db" + dbIndex);
-
-            return value;
-        }
-
-        private static int GetDBIndexByMessageHash(string msg)
-        {
-            int hash = 0;
-            foreach (Char symbol in msg)
-            {
-                hash += symbol;
-            }
-            return hash % 16;
         }
 
         private static void SendToQueue(string id)
@@ -96,7 +74,8 @@ namespace VowelConsCounter
                         if (data[0] == "TextRankTask")
                         {
                             string id = data[1];
-                            string value = GetValueById(id);
+                            var db = new DBHandler();
+                            string value = db.GetValueById(id);
                             CalcVowelsCons(value);
                             SendToQueue(id);
                             Console.WriteLine(id + ":" + vowelCount + ":" + consonantCount);

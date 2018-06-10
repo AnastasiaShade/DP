@@ -1,39 +1,39 @@
 ﻿using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using StackExchange.Redis;
 using System;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
+
 namespace VowelConsRater
 {
     class Program
     {
-        private static void SendRankToDB(string id, float value) 
-        {
-            int dbIndex = GetDBIndexByMessageHash(id);
-            ConnectionMultiplexer redis = ConnectionMultiplexer.Connect("localhost, abortConnect=false");
-            IDatabase db = redis.GetDatabase(dbIndex);
-            db.StringSet(id, value);     
-            Console.WriteLine(id + " sent to db" + dbIndex);         
-        }
-
-        private static int GetDBIndexByMessageHash(string msg)
-        {
-            int hash = 0;
-            foreach (Char symbol in msg)
-            {
-                hash += symbol;
-            }
-            return hash % 16;
-        }
-
-        private static float CalcRank(string vowels, string consonant)
+        static private float CalcRank(string vowels, string consonant)
         {
             float vowelCount = float.Parse(vowels);
             float consonantCount = float.Parse(consonant);
 
             return (consonantCount == 0) ? vowelCount : vowelCount / consonantCount;
+        }
+
+        static private void SendRankToQueue(string id, float value)
+        {
+            var factory = new ConnectionFactory() { HostName = "localhost" };
+            using(var connection = factory.CreateConnection())
+            using(var channel = connection.CreateModel())
+            {
+                channel.ExchangeDeclare("text-rank-calc", "fanout");
+
+                string message = "TextRankCalculated:" + id + ":" + value;
+                var body = Encoding.UTF8.GetBytes(message);
+
+                channel.BasicPublish(exchange: "text-rank-calc",
+                                    routingKey: "",
+                                    basicProperties: null,
+                                    body: body
+                ); 
+            }
         }
 
         static void Main(string[] args)
@@ -59,9 +59,11 @@ namespace VowelConsRater
                         if (data[0] == "VowelConsCounted")
                         {
                             string id = data[1];
+                            var db = new DBHandler();
                             float rank = CalcRank(data[2], data[3]);
                             Console.WriteLine(rank);
-                            SendRankToDB(id, rank);
+                            db.SendToDB(id, rank);
+                            SendRankToQueue(id, rank);
                         }
                     };
                     
